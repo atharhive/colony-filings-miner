@@ -1,0 +1,72 @@
+version: "1"
+kind: miner
+id: 20261124
+slug: colony-filings
+protocol: generic
+name: Colony Filings Desk
+description: >-
+  Counts SEC filings for one issuer inside a stated window, and refuses to invent a
+  number. Resolves the company to a CIK, filters its filings index by date, and returns
+  the count with the titles and URLs behind it. A company that does not file with the
+  SEC returns "unresolved", never zero: an unregistered entity and a company with no
+  filings are different facts and must not collapse into the same answer.
+base_url: https://REPLACE-WITH-DEPLOYMENT-URL
+rate_limit_per_sec: 2
+cache_ttl_sec: 3600
+circuit_threshold: 5
+circuit_cooldown_seconds: 60
+docs:
+  repository: https://github.com/atharhive/colony-filings-miner
+limitations:
+  - code: MAX_PARAM_LENGTH
+    message: entity and period must be at most 256 characters
+    param: entity
+    property: length
+    value_num: 256
+    operator: lte
+  - code: MAX_PARAM_LENGTH
+    message: entity and period must be at most 256 characters
+    param: period
+    property: length
+    value_num: 256
+    operator: lte
+errors:
+  message_path: error
+endpoints:
+  - path: /filings
+    external_path: /filings
+    method: POST
+    description: >-
+      Count filings for one entity inside one period. Accepts "last 12 months",
+      "last 90 days", "2025", "since 2024-01-01" and "2024-01-01 to 2024-12-31".
+      Returns filing_count, the titles and URLs of the newest filings, and echoes the
+      resolved issuer name. Responses carry X-Miner-Status, which is "unresolved" when
+      the window could not be searched.
+    intents: [REGULATORY_FILING_MONITOR_GENERAL]
+    params:
+      body:
+        required:
+          - name: entity
+            type: string
+            intents: ["*"]
+            description: The company or issuer, e.g. "Apple Inc." or "Tesla".
+          - name: period
+            type: string
+            intents: ["*"]
+            description: >-
+              The filing window in plain English, e.g. "last 12 months", "last 90 days",
+              "2025", or "2024-01-01 to 2024-12-31".
+intent_mapping:
+  REGULATORY_FILING_MONITOR_GENERAL:
+    endpoint: /filings
+    input:
+      entity: { from: entity }
+      period: { from: period }
+    output:
+      entity: { path: entity }
+      filing_count: { path: filing_count }
+      filings: { path: filings }
+      urls: { path: urls }
+semantics:
+  supported_intents:
+    - REGULATORY_FILING_MONITOR_GENERAL
